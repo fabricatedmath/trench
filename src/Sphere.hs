@@ -15,11 +15,26 @@ data Sphere a =
     , _sphereCenter :: !(V3 a)
     } deriving (Show, Read)
 
+data BoundingSphere o a =
+  BoundingSphere
+  { _boundingSphere :: Sphere a
+  , _boundingSphereObject :: o
+  } deriving (Show, Read)
+
 makeLenses ''Sphere
 
 instance (Floating a, Ord a) => Intersectable (Sphere a) a where
   intersects s (Ray p d) = uncurry Hit <$> rayAgainstSphere s (p,d)
   intersects' s (Ray p d) = rayAgainstSphere' s (p,d)
+
+instance (Floating a, Intersectable o a, Ord a) => Intersectable (BoundingSphere o a) a where
+  intersects (BoundingSphere s o) r@(Ray rp rd)  =
+    intersects s r >>=
+    (\h -> do
+        let rp' = _hitPos h
+        return h
+    )
+  --intersects' (BoundingSphere s o) r = False
 
 sphere :: Num a => a -> V3 a -> Sphere a
 sphere r c = Sphere r c

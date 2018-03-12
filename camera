@@ -1,0 +1,1 @@
+Camera {_sensorWidth = 2.0, _resolution = V2 200 200, _hfov = 70.0, _location = V3 0.0 0.0 (-10.0), _lookingAt = V3 0.0 0.0 0.0}

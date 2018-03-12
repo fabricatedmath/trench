@@ -30,7 +30,10 @@ mergeColor (a1,a2,a3) (b1,b2,b3) = (averageWord8 a1 b1,averageWord8 a2 b2,averag
 main :: IO ()
 main =
   do
-    let camera = defaultCamera { _resolution = V2 1080 1080, _hfov = 70 }
+    fileS <- readFile "/Users/cdurham/Desktop/camera"
+    --print fileS
+    --let camera = defaultCamera { _resolution = V2 1080 1080, _hfov = 70 }
+    let camera = read fileS
     let viewPlane = buildViewPlane 1 camera :: Array U DIM3 (V3 Double, V3 Double)
     viewPlane `seq` return ()
     print "built"
@@ -38,7 +41,7 @@ main =
     let image = runIdentity $ foldP mergeColor (0,0,0) $
                 --R.map (\ray -> boolToColor $ any (\s -> rayAgainstSphere' s ray) spheres) viewPlane
                 R.map (\(p,d) -> boolToColor $ intersects' j $ Ray p d) viewPlane
-    writeImageToBMP "/home/cdurham/Desktop/sphere.bmp" image
+    writeImageToBMP "/Users/cdurham/Desktop/sphere.bmp" image
 
 
 spheres :: [Sphere Double]
