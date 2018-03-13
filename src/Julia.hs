@@ -57,6 +57,7 @@ juliaDistance (Julia ii b c _ _) v =
       (!r,!dr) = (norm qf, norm dqf)
         where (!qf,!dqf) = go ii qdqi
   in 0.5 * r * log r / dr
+{-# INLINABLE juliaDistance #-}
 
 marchJulia
   :: RealFloat a
@@ -74,3 +75,4 @@ marchJulia maxSteps j@(Julia _ _ _ f t) (Ray rp rd) =
       where
         rp' = rp + d*^rd
         d' = f * juliaDistance j rp'
+{-# INLINABLE marchJulia #-}

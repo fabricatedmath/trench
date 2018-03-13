@@ -21,10 +21,10 @@ import Linear
 import Type
 
 buildViewPlane
-  :: forall a. (Epsilon a, Floating a, Fractional a, Ord a, Unbox a)
+  :: forall a m. (Epsilon a, Floating a, Fractional a, Ord a, Unbox a, Monad m)
   => Int -- aa
   -> Camera a
-  -> Array U DIM3 (V3 a, V3 a)
+  -> m (Array U DIM3 (V3 a, V3 a))
 buildViewPlane aa (Camera w res@(V2 resY resX) hfov loc _) =
   let
     res'@(V2 resY' resX') = fromIntegral <$> res
@@ -44,6 +44,8 @@ buildViewPlane aa (Camera w res@(V2 resY resX) hfov loc _) =
         pixelCamera = pixelScreen * hAspect * theta
         dir = normalize $ _xy .~ pixelCamera $ (-1)
       in
-        (V3 0 0 2, dir)
+        (loc, dir)
   in
-    runIdentity $ computeUnboxedP $ fromFunction dim placeRay
+    computeUnboxedP $ fromFunction dim placeRay
+
+{-# INLINABLE buildViewPlane #-}

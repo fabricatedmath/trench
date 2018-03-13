@@ -30,18 +30,26 @@ mergeColor (a1,a2,a3) (b1,b2,b3) = (averageWord8 a1 b1,averageWord8 a2 b2,averag
 main :: IO ()
 main =
   do
-    fileS <- readFile "/Users/cdurham/Desktop/camera"
+    fileS <- readFile "camera"
     --print fileS
     --let camera = defaultCamera { _resolution = V2 1080 1080, _hfov = 70 }
-    let camera = read fileS
-    let viewPlane = buildViewPlane 1 camera :: Array U DIM3 (V3 Double, V3 Double)
-    viewPlane `seq` return ()
+    let camera = read fileS :: Camera Double
+    --let viewPlane =
+          --buildViewPlane 1 camera :: Array U DIM3 (V3 Double, V3 Double)
+    --viewPlane `seq` return ()
     print "built"
     let j = defaultJulia :: Julia Double
-    let image = runIdentity $ foldP mergeColor (0,0,0) $
+        r = axisAngle (V3 1 0 0) 0 --(pi/2)
+        o = BoundingSphere (Sphere 4 $ V3 0 0 0) r (j) :: BoundingSphere (Julia Double) Double
+    let image =
+          runIdentity $
+          do
+            viewPlane <- buildViewPlane 1 camera
+            foldP mergeColor (0,0,0) $ R.map (\(p,d) -> boolToColor $ intersects' o $ Ray p d) viewPlane
+    --let image = runIdentity $ foldP mergeColor (0,0,0) $
                 --R.map (\ray -> boolToColor $ any (\s -> rayAgainstSphere' s ray) spheres) viewPlane
-                R.map (\(p,d) -> boolToColor $ intersects' j $ Ray p d) viewPlane
-    writeImageToBMP "/Users/cdurham/Desktop/sphere.bmp" image
+--              R.map (\(p,d) -> boolToColor $ intersects' o $ Ray p d) viewPlane
+    writeImageToBMP "sphere.bmp" image
 
 
 spheres :: [Sphere Double]

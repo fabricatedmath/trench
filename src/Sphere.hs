@@ -18,23 +18,46 @@ data Sphere a =
 data BoundingSphere o a =
   BoundingSphere
   { _boundingSphere :: Sphere a
+  , _boundingSphereRotation :: Quaternion a
   , _boundingSphereObject :: o
   } deriving (Show, Read)
+
+boundingSphere
+  :: Num a
+  => Sphere a
+  -> o
+  -> BoundingSphere o a
+boundingSphere s o = BoundingSphere s r o
+  where r = Quaternion 1 0
 
 makeLenses ''Sphere
 
 instance (Floating a, Ord a) => Intersectable (Sphere a) a where
   intersects s (Ray p d) = uncurry Hit <$> rayAgainstSphere s (p,d)
-  intersects' s (Ray p d) = rayAgainstSphere' s (p,d)
+  {-# INLINABLE intersects #-}
 
-instance (Floating a, Intersectable o a, Ord a) => Intersectable (BoundingSphere o a) a where
-  intersects (BoundingSphere s o) r@(Ray rp rd)  =
+  intersects' s (Ray p d) = rayAgainstSphere' s (p,d)
+  {-# INLINABLE intersects' #-}
+
+instance (Conjugate a, Floating a, Intersectable o a, RealFloat a, Ord a) => Intersectable (BoundingSphere o a) a where
+  intersects (BoundingSphere s rot o) r@(Ray _rp rd)  =
     intersects s r >>=
     (\h -> do
-        let rp' = _hitPos h
-        return h
+        let rp' = rotate rot $ _hitPos h
+            rd' = rotate rot rd
+        intersects o (Ray rp' rd')
     )
-  --intersects' (BoundingSphere s o) r = False
+  {-# INLINABLE intersects #-}
+
+  intersects' (BoundingSphere s rot o) r@(Ray _rp rd) =
+    case intersects s r of
+      Nothing -> False
+      Just h ->
+        let rp' = rotate rot $ _hitPos h
+            rd' = rotate rot rd
+        in
+          intersects' o $ Ray rp' rd'
+  {-# INLINABLE intersects' #-}
 
 sphere :: Num a => a -> V3 a -> Sphere a
 sphere r c = Sphere r c
@@ -63,6 +86,7 @@ rayAgainstSphere (Sphere r sc) (p,d)
       t = -b - sqrt discr
       t' = if t < 0 then 0 else t
       q = p + t *^ d
+{-# INLINABLE rayAgainstSphere #-}
 
 rayAgainstSphere'
   :: (Num a, Ord a)
@@ -78,3 +102,4 @@ rayAgainstSphere' (Sphere r sc) (p,d)
       c = m `dot` m - r * r
       b = m `dot` d
       discr = b*b - c
+{-# INLINABLE rayAgainstSphere' #-}
