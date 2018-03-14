@@ -62,6 +62,9 @@ instance (Conjugate a, Floating a, Intersectable o a, RealFloat a, Ord a) => Int
 sphere :: Num a => a -> V3 a -> Sphere a
 sphere r c = Sphere r c
 
+distSphere :: Floating a => V3 a -> Sphere a -> a
+distSphere p (Sphere r c) = norm p - r
+
 convertSphereHitToRadius
   :: (Epsilon a, Floating a)
   => Sphere a

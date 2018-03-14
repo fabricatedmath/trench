@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Type where
 
@@ -48,6 +49,9 @@ class Intersectable o a where
 
   intersects' :: o -> Ray a -> Bool
   intersects' o r = isJust $ intersects o r
+
+--class Normal o a where
+--  normalOf :: (forall s. o (s a)) -> V3 a -> V3 a
 
 class ShapeVector a f where
   shToVec :: a -> f Int

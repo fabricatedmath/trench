@@ -26,6 +26,11 @@ dependencies:
 - repa
 - mtl
 - vector
+- ad
+- reflection
+- accelerate
+- accelerate-llvm-ptx
+- linear-accelerate
 
 library:
   source-dirs: src
@@ -44,6 +49,10 @@ executables:
     dependencies:
     - trench
     - repa-io
+    - JuicyPixels
+    - pipes
+    - pipes-graphics
+    - pipes-safe
 
 tests:
   trench-test:

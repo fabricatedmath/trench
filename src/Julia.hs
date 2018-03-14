@@ -1,11 +1,21 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Julia where
 
+import Data.Reflection
+
 import Linear
+import Numeric.AD
+import Numeric.AD.Mode.Reverse
+import Numeric.AD.Internal.Reverse
 
 import Type
 
@@ -22,6 +32,18 @@ data Julia a =
 
 instance RealFloat a => Intersectable (Julia a) a where
   intersects = marchJulia 200
+
+{-
+normalOf
+  :: RealFloat a
+  => (forall s. Reifies s Tape => Julia (Reverse s a))
+  -> V3 a
+  -> V3 a
+normalOf j p = grad (juliaDistance j) p
+-}
+
+testF :: Floating a => a -> V3 a -> a
+testF a v = norm $ a*^v
 
 defaultJulia :: Fractional a => Julia a
 defaultJulia =
@@ -41,21 +63,31 @@ initial (V3 x y z) = (q,dq)
   where q = Quaternion x $ V3 0 y z
         dq = Quaternion 1 $ V3 0 0 0
 
+instance (Mode a, Num a) => Mode (V3 a) where
+  type Scalar (V3 a) = V3 (Scalar a)
+  auto (V3 x y z) = V3 (auto x) (auto y) (auto z)
+
+instance (Mode a, RealFloat a, RealFloat (Scalar a)) => Mode (Quaternion a) where
+  type Scalar (Quaternion a) = Quaternion (Scalar a)
+  auto (Quaternion a v) = Quaternion (auto a) $ auto v
+
 juliaDistance
   :: forall a. (Floating a, RealFloat a, Ord a)
-  => Julia a
+  => Int
+  -> a
+  -> Quaternion a
   -> V3 a
   -> a
-juliaDistance (Julia ii b c _ _) v =
+juliaDistance iters bailout c v =
   let qdqi@(!_qi,!_dqi) = initial v
       go :: Int -> (Q a, Q a) -> (Q a, Q a)
       go i qdq@(!q,!dq)
-        | i == 0 || quadrance q > b = qdq
+        | i == 0 || quadrance q > bailout = qdq
         | otherwise = go (i-1) (q',dq')
         where q' = q*q+c
               dq' = 2 * (q*dq)
       (!r,!dr) = (norm qf, norm dqf)
-        where (!qf,!dqf) = go ii qdqi
+        where (!qf,!dqf) = go iters qdqi
   in 0.5 * r * log r / dr
 {-# INLINABLE juliaDistance #-}
 
@@ -65,7 +97,7 @@ marchJulia
   -> Julia a
   -> Ray a
   -> Maybe (Hit a)
-marchJulia maxSteps j@(Julia _ _ _ f t) (Ray rp rd) =
+marchJulia maxSteps j@(Julia iters bailout c f t) (Ray rp rd) =
   go maxSteps 0
   where
     go !i !d
@@ -74,5 +106,5 @@ marchJulia maxSteps j@(Julia _ _ _ f t) (Ray rp rd) =
       | otherwise = go (i-1) (d + d')
       where
         rp' = rp + d*^rd
-        d' = f * juliaDistance j rp'
+        d' = f * juliaDistance iters bailout c rp'
 {-# INLINABLE marchJulia #-}

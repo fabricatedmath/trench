@@ -1,3 +1,6 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RankNTypes #-}
+
 module Main where
 
 import Lib
@@ -5,6 +8,8 @@ import Julia
 import Sphere
 import Type
 
+import Codec.Picture
+import Control.Monad (forM_)
 import Control.Monad.Identity (runIdentity)
 
 import Data.Array.Repa as R
@@ -12,20 +17,31 @@ import Data.Array.Repa.IO.BMP (writeImageToBMP)
 
 import Data.Function (on)
 
+import Data.Reflection
+
 import Data.Word (Word8)
 
 import Linear
 
-boolToColor :: Bool -> (Word8,Word8,Word8)
-boolToColor True = (255,255,255)
-boolToColor False = (0,0,0)
+import Pipes
+import qualified Pipes.Prelude as P
+import Pipes.Graphics
+import Pipes.Safe
 
-averageWord8 :: Word8 -> Word8 -> Word8
-averageWord8 w1 w2 = fromIntegral w3
-  where w3 = (`div` 2) $ ((+) `on` fromIntegral) w1 w2 :: Int
+import Numeric.AD
+import Numeric.AD.Mode.Reverse
+import Numeric.AD.Internal.Reverse
 
-mergeColor :: (Word8,Word8,Word8) -> (Word8,Word8,Word8) -> (Word8,Word8,Word8)
-mergeColor (a1,a2,a3) (b1,b2,b3) = (averageWord8 a1 b1,averageWord8 a2 b2,averageWord8 a3 b3)
+boolToColor :: Bool -> V3 Word8
+boolToColor True = 255
+boolToColor False = 0
+
+mergeColor :: V3 Word8 -> V3 Word8 -> V3 Word8
+mergeColor v1 v2 =
+  let
+    v1' = fromIntegral <$> v1 :: V3 Int
+    v2' = fromIntegral <$> v2 :: V3 Int
+  in fromIntegral . (`div` 2) <$> (v1' + v2')
 
 main :: IO ()
 main =
@@ -34,22 +50,37 @@ main =
     --print fileS
     --let camera = defaultCamera { _resolution = V2 1080 1080, _hfov = 70 }
     let camera = read fileS :: Camera Double
-    --let viewPlane =
+        V2 width height = _resolution camera
+        --let viewPlane =
           --buildViewPlane 1 camera :: Array U DIM3 (V3 Double, V3 Double)
     --viewPlane `seq` return ()
     print "built"
-    let j = defaultJulia :: Julia Double
-        r = axisAngle (V3 1 0 0) 0 --(pi/2)
-        o = BoundingSphere (Sphere 4 $ V3 0 0 0) r (j) :: BoundingSphere (Julia Double) Double
-    let image =
-          runIdentity $
-          do
-            viewPlane <- buildViewPlane 1 camera
-            foldP mergeColor (0,0,0) $ R.map (\(p,d) -> boolToColor $ intersects' o $ Ray p d) viewPlane
+    let j = defaultJulia
+--        j' = defaultJulia :: (forall s. Reifies s Tape => Julia (Reverse s Double))
+        --r = axisAngle (V3 1 0 0) 0 --(pi/2)
+        --o = BoundingSphere (Sphere 4 $ V3 0 0 0) r (j) :: BoundingSphere (Julia Double) Double
+        viewPlane = runIdentity $ buildViewPlane 1 camera
+    print $ grad (juliaDistance (_juliaIters j) (auto $ _juliaBailout j) (auto $ _juliaC j)) $ V3 2 2 2
+    --print $ Julia.normalOf defaultJulia $ V3 2 2 2
+    viewPlane `deepSeqArray` return ()
+    let
+      image :: MonadIO m => Producer' (Image PixelRGB8) m ()
+      image = forM_ [0,0.05..10*pi] $ (\a -> (yield . image' $ a) >> liftIO (print "yielded"))
+        where image' a =
+                let
+                  rot = axisAngle (V3 1 0 0) a
+                  o = BoundingSphere (Sphere 4 $ V3 0 0 0) rot (j) :: BoundingSphere (Julia Double) Double
+                  in repaToImage $ runIdentity $
+                     do
+--                       viewPlane <- buildViewPlane 1 camera
+                       foldP mergeColor 0 $ R.map (\(p,d) -> boolToColor $ intersects' o $ Ray p d) viewPlane
     --let image = runIdentity $ foldP mergeColor (0,0,0) $
                 --R.map (\ray -> boolToColor $ any (\s -> rayAgainstSphere' s ray) spheres) viewPlane
 --              R.map (\(p,d) -> boolToColor $ intersects' o $ Ray p d) viewPlane
-    writeImageToBMP "sphere.bmp" image
+    --writeImageToBMP "sphere.bmp" image
+      consumer = ffmpegConsumer $ FFmpegOpts width height 60 "/home/cdurham/Desktop/dog.mp4"
+    runSafeT $ runEffect $ image >-> consumer
+    print "dog"
 
 
 spheres :: [Sphere Double]
