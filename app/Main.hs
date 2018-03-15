@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RankNTypes #-}
 
 module Main where
@@ -25,49 +26,32 @@ import Linear
 
 import Pipes
 import qualified Pipes.Prelude as P
-import Pipes.Graphics
+import Pipes.Graphics (ffmpegConsumer, repaToImage, FFmpegOpts(..))
 import Pipes.Safe
 
 import Numeric.AD
 import Numeric.AD.Mode.Reverse
 import Numeric.AD.Internal.Reverse
 
+import Text.Printf
+
 boolToColor :: Maybe Double -> Double
-boolToColor (Just f) = f
+boolToColor (Just f) = max 0 f
 boolToColor Nothing = 0
-
-mergeColor :: V3 Word8 -> V3 Word8 -> V3 Word8
-mergeColor v1 v2 =
-  let
-    v1' = fromIntegral <$> v1 :: V3 Int
-    v2' = fromIntegral <$> v2 :: V3 Int
-  in fromIntegral . (`div` 2) <$> (v1' + v2')
-
 
 toVec :: a -> V3 a
 toVec d = pure d
-
-
 
 main :: IO ()
 main =
   do
     fileS <- readFile "camera"
-    --print fileS
-    --let camera = defaultCamera { _resolution = V2 1080 1080, _hfov = 70 }
     let camera = read fileS :: Camera Double
         V2 width height = _resolution camera
-        --let viewPlane =
-          --buildViewPlane 1 camera :: Array U DIM3 (V3 Double, V3 Double)
-    --viewPlane `seq` return ()
-    print "built"
-    let j = defaultJulia
---        j' = defaultJulia :: (forall s. Reifies s Tape => Julia (Reverse s Double))
-        --r = axisAngle (V3 1 0 0) 0 --(pi/2)
-        --o = BoundingSphere (Sphere 4 $ V3 0 0 0) r (j) :: BoundingSphere (Julia Double) Double
-        viewPlane = runIdentity $ buildViewPlane 2 camera
-    --print $ grad (juliaDistance (_juliaIters j) (auto $ _juliaBailout j) (auto $ _juliaC j)) $ V3 2 2 2
-    --print $ Julia.normalOf defaultJulia $ V3 2 2 2
+        j = defaultJulia
+        aa = 2
+        aaSq = fromIntegral $ aa*aa
+        viewPlane = runIdentity $ buildViewPlane aa camera
     viewPlane `deepSeqArray` return ()
     let
       imageProducer :: MonadIO m => [Double] -> Producer' (Image PixelRGB8) m ()
@@ -78,31 +62,21 @@ main =
                   o = BoundingSphere (Sphere 4 $ V3 0 0 0) rot (j) :: BoundingSphere (Julia Double) Double
                 in repaToImage $ runIdentity $
                    do
-                     --                       viewPlane <- buildViewPlane 1 camera
-                     s <- sumP $ R.map (\(p,d) -> boolToColor . fmap (shade 5 100 0.01 j . _hitPos) $ intersects o (Ray p d)) viewPlane
-                     m <- foldAllP max 0 s
-                     s `seq` m `seq` (computeUnboxedP $ R.map (toVec . round . (*255) . (/4) . (/m)) s)
-    --let image = runIdentity $ foldP mergeColor (0,0,0) $
-                --R.map (\ray -> boolToColor $ any (\s -> rayAgainstSphere' s ray) spheres) viewPlane
---              R.map (\(p,d) -> boolToColor $ intersects' o $ Ray p d) viewPlane
-    --writeImageToBMP "sphere.bmp" image
-      consumer :: MonadSafe m => Consumer' (Image PixelRGB8) m ()
-      consumer = ffmpegConsumer $ FFmpegOpts width height 60 "/home/cdurham/Desktop/dog.mp4"
+                     s <- sumP $ R.map (\(p,d) -> boolToColor . fmap (shade 10 28 0.02 j . _hitPos) $ intersects o (Ray p d)) viewPlane
+                     s `seq` (computeUnboxedP $ R.map (toVec . min 255 . round . (*255) . (/aaSq)) s)
+      consumerFFmpeg :: MonadSafe m => Consumer' (Image PixelRGB8) m ()
+      consumerFFmpeg = ffmpegConsumer $ FFmpegOpts width height 60 "/home/cdurham/Desktop/dog.mp4"
 
-      consumerWriter :: MonadIO m => Consumer' (Image PixelRGB8) m ()
-      consumerWriter =
-        --forever $
-        do
-          image <- await
-          liftIO $ writePng "/home/cdurham/Desktop/dogger-1.png" image
-          image2 <- await
-          liftIO $ writePng "/home/cdurham/Desktop/dogger-2.png" image2
-          image3 <- await
-          liftIO $ writePng "/home/cdurham/Desktop/dogger-3.png" image3
-      l = [0,0.05..10*pi]
-    runEffect $ imageProducer [0,7*pi/4,0.10] >-> consumerWriter
-    print "dog"
-
+      consumerWriter :: forall m. MonadIO m => Consumer' (Image PixelRGB8) m ()
+      consumerWriter = go 0
+        where
+          go :: Int -> Consumer' (Image PixelRGB8) m ()
+          go i = do
+            image <- await
+            liftIO $ writePng (printf "/home/cdurham/Desktop/%03d.png" i) image
+            go (i+1)
+      list = [0,0.01..2*pi]
+    runSafeT $ runEffect $ imageProducer list >-> consumerFFmpeg
 
 spheres :: [Sphere Double]
 spheres = [sphere 1 $ V3 y x z | y <- [-30,-27..30], x <- [-30,-27..30],  z <- [-30]] -- [ (sphere 1 $ V3 0 0 (-300))

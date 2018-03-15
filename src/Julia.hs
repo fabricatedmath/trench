@@ -31,11 +31,11 @@ data Julia a =
 defaultJulia :: Fractional a => Julia a
 defaultJulia =
   Julia
-  { _juliaIters = 50
+  { _juliaIters = 100
   , _juliaBailout = 10000
   , _juliaC = Quaternion (-0.125) $ V3 (-0.256) 0.847 0
-  , _juliaFudge = 0.8
-  , _juliaThresh = 0.0001
+  , _juliaFudge = 0.5
+  , _juliaThresh = 0.001
   }
 
 instance (Mode a, Num a) => Mode (V3 a) where
@@ -118,7 +118,7 @@ marchJulia maxSteps j@(Julia iters bailout c f t) (Ray rp rd) =
   go maxSteps 0
   where
     go !i !d
-      | i == 0 || d > 8 = Nothing
+      | i == 0 || d > 10 = Nothing
       | d' < t = Just $ Hit d rp'
       | otherwise = go (i-1) (d + d')
       where
