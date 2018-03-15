@@ -50,8 +50,11 @@ class Intersectable o a where
   intersects' :: o -> Ray a -> Bool
   intersects' o r = isJust $ intersects o r
 
---class Normal o a where
---  normalOf :: (forall s. o (s a)) -> V3 a -> V3 a
+class Normal o a where
+  normalOf :: o a -> V3 a -> V3 a
+
+class Shade o a where
+  shade :: Int -> a -> a -> o a -> V3 a -> a
 
 class ShapeVector a f where
   shToVec :: a -> f Int

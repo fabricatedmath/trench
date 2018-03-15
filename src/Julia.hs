@@ -10,12 +10,10 @@
 
 module Julia where
 
-import Data.Reflection
+import Control.Arrow
 
 import Linear
 import Numeric.AD
-import Numeric.AD.Mode.Reverse
-import Numeric.AD.Internal.Reverse
 
 import Type
 
@@ -30,30 +28,27 @@ data Julia a =
   , _juliaThresh :: a
   } deriving (Show, Read)
 
-instance RealFloat a => Intersectable (Julia a) a where
-  intersects = marchJulia 200
-
-{-
-normalOf
-  :: RealFloat a
-  => (forall s. Reifies s Tape => Julia (Reverse s a))
-  -> V3 a
-  -> V3 a
-normalOf j p = grad (juliaDistance j) p
--}
-
-testF :: Floating a => a -> V3 a -> a
-testF a v = norm $ a*^v
-
 defaultJulia :: Fractional a => Julia a
 defaultJulia =
   Julia
-  { _juliaIters = 200
+  { _juliaIters = 50
   , _juliaBailout = 10000
   , _juliaC = Quaternion (-0.125) $ V3 (-0.256) 0.847 0
   , _juliaFudge = 0.8
-  , _juliaThresh = 0.001
+  , _juliaThresh = 0.0001
   }
+
+instance (Mode a, Num a) => Mode (V3 a) where
+  type Scalar (V3 a) = V3 (Scalar a)
+  auto (V3 x y z) = V3 (auto x) (auto y) (auto z)
+
+instance (Mode a, RealFloat a, RealFloat (Scalar a)) => Mode (Quaternion a) where
+  type Scalar (Quaternion a) = Quaternion (Scalar a)
+  auto (Quaternion a v) = Quaternion (auto a) $ auto v
+
+instance RealFloat a => Intersectable (Julia a) a where
+  intersects = marchJulia 200
+  {-# INLINABLE intersects #-}
 
 initial
   :: Num a
@@ -63,13 +58,24 @@ initial (V3 x y z) = (q,dq)
   where q = Quaternion x $ V3 0 y z
         dq = Quaternion 1 $ V3 0 0 0
 
-instance (Mode a, Num a) => Mode (V3 a) where
-  type Scalar (V3 a) = V3 (Scalar a)
-  auto (V3 x y z) = V3 (auto x) (auto y) (auto z)
+juliaFunc :: Num p => p -> p -> (p,p)
+juliaFunc c = Numeric.AD.diff' (\q -> q*q+auto c)
+{-# INLINABLE juliaFunc #-}
 
-instance (Mode a, RealFloat a, RealFloat (Scalar a)) => Mode (Quaternion a) where
-  type Scalar (Quaternion a) = Quaternion (Scalar a)
-  auto (Quaternion a v) = Quaternion (auto a) $ auto v
+instance RealFloat a => Normal Julia a where
+  normalOf j = juliaNormal (_juliaIters j) (_juliaBailout j) (_juliaC j)
+  {-# INLINABLE normalOf #-}
+
+juliaNormal
+  :: RealFloat a
+  => Int --iters
+  -> a --bailout
+  -> Quaternion a --c
+  -> V3 a
+  -> V3 a
+juliaNormal iters bailout c =
+  grad (juliaDistance iters (auto bailout) (auto c))
+{-# INLINABLE juliaNormal #-}
 
 juliaDistance
   :: forall a. (Floating a, RealFloat a, Ord a)
@@ -84,12 +90,23 @@ juliaDistance iters bailout c v =
       go i qdq@(!q,!dq)
         | i == 0 || quadrance q > bailout = qdq
         | otherwise = go (i-1) (q',dq')
-        where q' = q*q+c
-              dq' = 2 * (q*dq)
+        where (q',dq') = second (*dq) $ juliaFunc c q
       (!r,!dr) = (norm qf, norm dqf)
         where (!qf,!dqf) = go iters qdqi
   in 0.5 * r * log r / dr
 {-# INLINABLE juliaDistance #-}
+
+instance (RealFloat a, Fractional a) => Shade Julia a where
+  shade num k del j p =
+    let
+      n = normalOf j p
+      df = juliaDistance (_juliaIters j) (_juliaBailout j) (_juliaC j)
+      f i =
+        let i' = fromIntegral i
+        in recip (2^i) * (i'*del - df (p + (n^*(i'*del))))
+
+    in 1 - k * sum (map f [1..num])
+  {-# INLINABLE shade #-}
 
 marchJulia
   :: RealFloat a

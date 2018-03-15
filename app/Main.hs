@@ -9,7 +9,7 @@ import Sphere
 import Type
 
 import Codec.Picture
-import Control.Monad (forM_)
+import Control.Monad (forM_, forever)
 import Control.Monad.Identity (runIdentity)
 
 import Data.Array.Repa as R
@@ -32,9 +32,9 @@ import Numeric.AD
 import Numeric.AD.Mode.Reverse
 import Numeric.AD.Internal.Reverse
 
-boolToColor :: Bool -> V3 Word8
-boolToColor True = 255
-boolToColor False = 0
+boolToColor :: Maybe Double -> Double
+boolToColor (Just f) = f
+boolToColor Nothing = 0
 
 mergeColor :: V3 Word8 -> V3 Word8 -> V3 Word8
 mergeColor v1 v2 =
@@ -42,6 +42,12 @@ mergeColor v1 v2 =
     v1' = fromIntegral <$> v1 :: V3 Int
     v2' = fromIntegral <$> v2 :: V3 Int
   in fromIntegral . (`div` 2) <$> (v1' + v2')
+
+
+toVec :: a -> V3 a
+toVec d = pure d
+
+
 
 main :: IO ()
 main =
@@ -59,27 +65,42 @@ main =
 --        j' = defaultJulia :: (forall s. Reifies s Tape => Julia (Reverse s Double))
         --r = axisAngle (V3 1 0 0) 0 --(pi/2)
         --o = BoundingSphere (Sphere 4 $ V3 0 0 0) r (j) :: BoundingSphere (Julia Double) Double
-        viewPlane = runIdentity $ buildViewPlane 1 camera
-    print $ grad (juliaDistance (_juliaIters j) (auto $ _juliaBailout j) (auto $ _juliaC j)) $ V3 2 2 2
+        viewPlane = runIdentity $ buildViewPlane 2 camera
+    --print $ grad (juliaDistance (_juliaIters j) (auto $ _juliaBailout j) (auto $ _juliaC j)) $ V3 2 2 2
     --print $ Julia.normalOf defaultJulia $ V3 2 2 2
     viewPlane `deepSeqArray` return ()
     let
-      image :: MonadIO m => Producer' (Image PixelRGB8) m ()
-      image = forM_ [0,0.05..10*pi] $ (\a -> (yield . image' $ a) >> liftIO (print "yielded"))
+      imageProducer :: MonadIO m => [Double] -> Producer' (Image PixelRGB8) m ()
+      imageProducer l = forM_ l $ (\a -> let image'' = image' a in image'' `seq` return () >> (yield image'') >> liftIO (print "yielded"))
         where image' a =
                 let
                   rot = axisAngle (V3 1 0 0) a
                   o = BoundingSphere (Sphere 4 $ V3 0 0 0) rot (j) :: BoundingSphere (Julia Double) Double
-                  in repaToImage $ runIdentity $
-                     do
---                       viewPlane <- buildViewPlane 1 camera
-                       foldP mergeColor 0 $ R.map (\(p,d) -> boolToColor $ intersects' o $ Ray p d) viewPlane
+                in repaToImage $ runIdentity $
+                   do
+                     --                       viewPlane <- buildViewPlane 1 camera
+                     s <- sumP $ R.map (\(p,d) -> boolToColor . fmap (shade 5 100 0.01 j . _hitPos) $ intersects o (Ray p d)) viewPlane
+                     m <- foldAllP max 0 s
+                     s `seq` m `seq` (computeUnboxedP $ R.map (toVec . round . (*255) . (/4) . (/m)) s)
     --let image = runIdentity $ foldP mergeColor (0,0,0) $
                 --R.map (\ray -> boolToColor $ any (\s -> rayAgainstSphere' s ray) spheres) viewPlane
 --              R.map (\(p,d) -> boolToColor $ intersects' o $ Ray p d) viewPlane
     --writeImageToBMP "sphere.bmp" image
+      consumer :: MonadSafe m => Consumer' (Image PixelRGB8) m ()
       consumer = ffmpegConsumer $ FFmpegOpts width height 60 "/home/cdurham/Desktop/dog.mp4"
-    runSafeT $ runEffect $ image >-> consumer
+
+      consumerWriter :: MonadIO m => Consumer' (Image PixelRGB8) m ()
+      consumerWriter =
+        --forever $
+        do
+          image <- await
+          liftIO $ writePng "/home/cdurham/Desktop/dogger-1.png" image
+          image2 <- await
+          liftIO $ writePng "/home/cdurham/Desktop/dogger-2.png" image2
+          image3 <- await
+          liftIO $ writePng "/home/cdurham/Desktop/dogger-3.png" image3
+      l = [0,0.05..10*pi]
+    runEffect $ imageProducer [0,7*pi/4,0.10] >-> consumerWriter
     print "dog"
 
 

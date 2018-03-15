@@ -13,8 +13,9 @@ import Prelude as P
 import Linear as P
 
 type Q = Quaternion
---arr :: Array DIM2 Float
---arr = A.fromList (Z :. 100 :. 100 :: DIM2) ([V3 ]
+
+arr :: Array DIM2 (V3 Float)
+arr = A.fromList (Z :. 100 :. 100 :: DIM2) ([ V3 x y z | x <- [0..30], y <- [0..30], z <- [0..30]] :: [V3 Float])
 
 --f :: P.Floating a => a -> a
 --f = signum
@@ -26,6 +27,10 @@ g = run1 (A.foldAll (+) 0 . A.map (\y -> (\([x1,y1,z1]) -> lift $ V3 x1 y1 z1) $
 -}
 
 --g1 = run1 (A.map (\y -> grad (\(V3 x y z) -> h (lift $ V3 x y z)) (V3 y y y))) $ arr
+
+--g = run1 (A.foldAll (+) 0 . A.map (A.iterate 100 (juliaDistance 100 0.1 initialC . unlift))) arr
+
+--initialC = Quaternion (-0.125) $ V3 (-0.256) 0.847 0
 
 juliaDistance
   :: forall a. (P.Floating a, P.RealFloat a, P.Ord a)
@@ -41,7 +46,7 @@ juliaDistance iters bailout c v =
         | i P.== 0 = qdq
         | otherwise = go (i-1) (q',dq')
         where q' = fmap (b*) q + fmap (notb*) (q*q+c)
-              dq' = fmap (b*) dq + fmap (notb*) (2 * (q*dq))
+              dq' = fmap (b*) dq + fmap (notb*) (2*(q*dq))
               b = signum $ P.max 0 $ (P.quadrance q - bailout)
               notb = abs $ b - 1
       (!r,!dr) = (P.norm qf, P.norm dqf)
