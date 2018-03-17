@@ -5,6 +5,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Julia.AD where
 
@@ -64,7 +65,7 @@ marchJulia
   -> Julia a
   -> Ray a
   -> Maybe (Hit a)
-marchJulia maxSteps j@(Julia iters bailout c f t) (Ray rp rd) =
+marchJulia maxSteps (Julia iters bailout c f t) (Ray rp rd) =
   go maxSteps 0
   where
     go !i !d

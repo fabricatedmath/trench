@@ -8,13 +8,9 @@
 module Lib where
 
 import Control.Lens
-import Control.Monad.Identity (runIdentity)
 
 import Data.Array.Repa hiding ((*^))
-import Data.Function (on)
-import Data.Maybe (isJust)
-import Data.Vector.Unboxed (Vector, Unbox)
-import qualified Data.Vector.Unboxed as U
+import Data.Vector.Unboxed (Unbox)
 
 import Linear
 
@@ -25,7 +21,7 @@ buildViewPlane
   => Int -- aa
   -> Camera a
   -> m (Array U DIM3 (V3 a, V3 a))
-buildViewPlane aa (Camera w res@(V2 resY resX) hfov loc _) =
+buildViewPlane aa (Camera _w res@(V2 resY resX) hfov loc _) =
   let
     res'@(V2 resY' resX') = fromIntegral <$> res
     resInv = recip <$> res'

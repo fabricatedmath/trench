@@ -14,7 +14,6 @@ import Control.Arrow
 import Control.Lens
 
 import Linear
-import Numeric.AD
 
 import Type
 
@@ -58,7 +57,7 @@ marchJulia
   -> Julia a
   -> Ray a
   -> Maybe (Hit a)
-marchJulia maxSteps j@(Julia iters bailout c f t) (Ray rp rd) =
+marchJulia maxSteps (Julia iters bailout c f t) (Ray rp rd) =
   go maxSteps 0
   where
     go !i !d

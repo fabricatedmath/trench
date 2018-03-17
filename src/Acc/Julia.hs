@@ -4,9 +4,7 @@
 
 module Acc.Julia where
 
-import Numeric.AD
 import Data.Array.Accelerate as A
-import Data.Array.Accelerate.LLVM.PTX
 import Data.Array.Accelerate.Linear as A
 
 import Prelude as P
