@@ -33,7 +33,7 @@ defaultCamera =
   { _sensorWidth = 2
   , _resolution = V2 1000 1000
   , _hfov = 60
-  , _location = V3 (-0.3) 0 3
+  , _location = V3 0 0 0
   , _lookingAt = V3 0 0 0
   }
 
