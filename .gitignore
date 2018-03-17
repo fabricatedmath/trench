@@ -1,5 +1,6 @@
 .stack-work/
 trench.cabal
+*.json
 *~
 *.bmp
 *.png

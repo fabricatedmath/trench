@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -9,18 +10,32 @@ import Type
 
 import Control.Lens
 
+import Data.Aeson
+
+import GHC.Generics
+
 data Sphere a =
     Sphere
     { _sphereRadius :: !a
     , _sphereCenter :: !(V3 a)
-    } deriving (Show, Read)
+    } deriving (Generic, Show, Read)
+
+instance ToJSON a => ToJSON (Sphere a) where
+  toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON a => FromJSON (Sphere a)
 
 data BoundingSphere o a =
   BoundingSphere
   { _boundingSphere :: Sphere a
   , _boundingSphereRotation :: Quaternion a
   , _boundingSphereObject :: o
-  } deriving (Show, Read)
+  } deriving (Generic, Show, Read)
+
+instance (ToJSON o, ToJSON a) => ToJSON (BoundingSphere o a) where
+  toEncoding = genericToEncoding defaultOptions
+
+instance (FromJSON o, FromJSON a) => FromJSON (BoundingSphere o a)
 
 boundingSphere
   :: Num a
@@ -39,7 +54,9 @@ instance (Floating a, Ord a) => Intersectable (Sphere a) a where
   intersects' s (Ray p d) = rayAgainstSphere' s (p,d)
   {-# INLINABLE intersects' #-}
 
-instance (Conjugate a, Floating a, Intersectable o a, RealFloat a, Ord a) => Intersectable (BoundingSphere o a) a where
+instance
+  (Conjugate a, Floating a, Intersectable o a, RealFloat a, Ord a
+  ) => Intersectable (BoundingSphere o a) a where
   intersects (BoundingSphere s rot o) r@(Ray _rp rd)  =
     intersects s r >>=
     (\h -> do

@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE InstanceSigs #-}
@@ -13,6 +14,10 @@ module Julia where
 import Control.Arrow
 import Control.Lens
 
+import Data.Aeson
+
+import GHC.Generics
+
 import Linear
 
 import Type
@@ -20,7 +25,7 @@ import Type
 type Q = Quaternion
 
 instance RealFloat a => Intersectable (Julia a) a where
-  intersects = marchJulia 400
+  intersects = marchJulia
   {-# INLINABLE intersects #-}
 
 data Julia a =
@@ -30,7 +35,13 @@ data Julia a =
   , _juliaC :: Q a
   , _juliaFudge :: a
   , _juliaThresh :: a
-  } deriving (Show, Read)
+  , _juliaMarchIter :: Int
+  } deriving (Generic, Show, Read)
+
+instance ToJSON a => ToJSON (Julia a) where
+  toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON a => FromJSON (Julia a)
 
 defaultJulia :: Fractional a => Julia a
 defaultJulia =
@@ -38,8 +49,9 @@ defaultJulia =
   { _juliaIters = 100
   , _juliaBailout = 10000
   , _juliaC = Quaternion (-0.125) $ V3 (-0.256) 0.847 0
-  , _juliaFudge = 0.5
+  , _juliaFudge = 0.75
   , _juliaThresh = 0.001
+  , _juliaMarchIter = 200
   }
 
 initial
@@ -51,13 +63,14 @@ initial (V3 x y z) = (q,dq)
         dq = Quaternion 1 $ V3 0 0 0
 {-# INLINABLE initial #-}
 
+
+--add consideration for sphere cord cut distance
 marchJulia
   :: RealFloat a
-  => Int
-  -> Julia a
+  => Julia a
   -> Ray a
   -> Maybe (Hit a)
-marchJulia maxSteps (Julia iters bailout c f t) (Ray rp rd) =
+marchJulia (Julia iters bailout c f t maxSteps) (Ray rp rd) =
   go maxSteps 0
   where
     go !i !d

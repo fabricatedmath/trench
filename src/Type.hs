@@ -1,17 +1,22 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE RankNTypes #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Type where
 
 import Control.Lens
 
+import Data.Aeson
 import Data.Array.Repa hiding ((*^))
 import Data.Maybe (isJust)
 
 import Linear
+
+import GHC.Generics hiding (V1)
 
 data Camera a =
   Camera
@@ -20,10 +25,17 @@ data Camera a =
   , _hfov :: a
   , _location :: V3 a
   , _lookingAt :: V3 a
-  } deriving (Show, Read)
+  } deriving (Generic, Show, Read)
 
-defaultCamera :: Camera Double
-defaultCamera = Camera 2 (V2 1080 1920) 90 (V3 0 0 (-10)) (V3 0 0 0)
+defaultCamera :: Fractional a => Camera a
+defaultCamera =
+  Camera
+  { _sensorWidth = 2
+  , _resolution = V2 1000 1000
+  , _hfov = 60
+  , _location = V3 (-0.3) 0 3
+  , _lookingAt = V3 0 0 0
+  }
 
 data Ray a =
   Ray
@@ -67,3 +79,33 @@ instance ShapeVector DIM3 V3 where
 
 instance ShapeVector DIM4 V4 where
   shToVec (Z :. z :. y :. x :. i) = V4 z y x i
+
+instance ToJSON a => ToJSON (Camera a) where
+  toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON a => FromJSON (Camera a)
+
+instance ToJSON a => ToJSON (V1 a) where
+  toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON a => FromJSON (V1 a)
+
+instance ToJSON a => ToJSON (V2 a) where
+  toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON a => FromJSON (V2 a)
+
+instance ToJSON a => ToJSON (V3 a) where
+  toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON a => FromJSON (V3 a)
+
+instance ToJSON a => ToJSON (V4 a) where
+  toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON a => FromJSON (V4 a)
+
+instance ToJSON a => ToJSON (Quaternion a) where
+  toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON a => FromJSON (Quaternion a)

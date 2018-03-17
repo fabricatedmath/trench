@@ -63,7 +63,7 @@ extra-deps:
   commit: feaf458f4ecbebc33846420cf6f4cfcf9ea090c5
 
 - git: https://github.com/fabricatedmath/pipes-graphics
-  commit: 06df0cae27d9e16f9201fcbdca7be9ffc0b53276
+  commit: d0f5d357737cd50a7aad477d1e09149976208228
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
