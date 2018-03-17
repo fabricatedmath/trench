@@ -63,7 +63,6 @@ initial (V3 x y z) = (q,dq)
         dq = Quaternion 1 $ V3 0 0 0
 {-# INLINABLE initial #-}
 
-
 --add consideration for sphere cord cut distance
 marchJulia
   :: RealFloat a
@@ -152,8 +151,11 @@ juliaAnalyticNormal iters bailout c v =
 {-# INLINABLE juliaAnalyticNormal #-}
 
 instance (Epsilon a, RealFloat a, Fractional a) => Shade Julia a where
-  shade num k del j p =
+  shade aoParams j p =
     let
+      num = _shaderNumSamples aoParams
+      k = _shaderK aoParams
+      del = _shaderDel aoParams
       n = normalOf j p
       df = juliaDistance (_juliaIters j) (_juliaBailout j) (_juliaC j)
       f i =

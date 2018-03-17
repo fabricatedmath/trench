@@ -50,6 +50,7 @@ data Raytracer a =
   { _object :: Object a
   , _camera :: Camera a
   , _aa :: Int
+  , _aoParams :: AOParams a
   } deriving (Generic, Show, Read)
 
 defaultRaytracer :: (Epsilon a, Floating a, Fractional a) => Raytracer a
@@ -64,6 +65,7 @@ defaultRaytracer =
         b = BoundingSphere s rot j
       in JuliaBounding b
   , _aa = 1
+  , _aoParams = defaultAOParams
   }
 
 instance ToJSON a => ToJSON (Raytracer a) where
@@ -146,6 +148,7 @@ main =
     let
       rt = _optRaytracer opts
       fp = _optFile opts
+      aoParams = _aoParams rt
       camera = _camera rt
       aa = _aa rt
       JuliaBounding (BoundingSphere sphere' _rot j) = _object rt
@@ -174,7 +177,7 @@ main =
                  foldedAA <- sumP $ R.map
                    (\(p,d) ->
                       maybe 0 (max 0)
-                      . fmap (shade 10 28 0.02 j . _hitPos) $
+                      . fmap (shade aoParams j . _hitPos) $
                       intersects o (Ray p d)
                    ) viewPlane
                  foldedAA `deepSeqArray`

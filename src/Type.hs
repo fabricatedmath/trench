@@ -18,6 +18,21 @@ import Linear
 
 import GHC.Generics hiding (V1)
 
+data AOParams a =
+  AOParams
+  { _shaderNumSamples :: Int
+  , _shaderK :: a
+  , _shaderDel :: a
+  } deriving (Generic, Show, Read)
+
+defaultAOParams :: Fractional a => AOParams a
+defaultAOParams =
+  AOParams
+  { _shaderNumSamples = 10
+  , _shaderK = 5.1
+  , _shaderDel = 0.1
+  }
+
 data Camera a =
   Camera
   { _sensorWidth :: a
@@ -33,7 +48,7 @@ defaultCamera =
   { _sensorWidth = 2
   , _resolution = V2 1000 1000
   , _hfov = 60
-  , _location = V3 0 0 0
+  , _location = V3 0 0 3
   , _lookingAt = V3 0 0 0
   }
 
@@ -56,6 +71,8 @@ data Hit a =
 
 makeLenses ''Hit
 
+type Accum a t = (t -> a -> t)
+
 class Intersectable o a where
   intersects :: o -> Ray a -> Maybe (Hit a)
 
@@ -66,7 +83,7 @@ class Normal o a where
   normalOf :: o a -> V3 a -> V3 a
 
 class Shade o a where
-  shade :: Int -> a -> a -> o a -> V3 a -> a
+  shade :: AOParams a -> o a -> V3 a -> a
 
 class ShapeVector a f where
   shToVec :: a -> f Int
@@ -79,6 +96,11 @@ instance ShapeVector DIM3 V3 where
 
 instance ShapeVector DIM4 V4 where
   shToVec (Z :. z :. y :. x :. i) = V4 z y x i
+
+instance ToJSON a => ToJSON (AOParams a) where
+  toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON a => FromJSON (AOParams a)
 
 instance ToJSON a => ToJSON (Camera a) where
   toEncoding = genericToEncoding defaultOptions

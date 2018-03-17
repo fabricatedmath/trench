@@ -116,8 +116,11 @@ juliaDistance iters bailout c v =
 {-# INLINABLE juliaDistance #-}
 
 instance (Epsilon a, RealFloat a, Fractional a) => Shade Julia a where
-  shade num k del j p =
+  shade aoParams j p =
     let
+      num = _shaderNumSamples aoParams
+      k = _shaderK aoParams
+      del = _shaderDel aoParams
       n = normalOf j p
       df = juliaDistance (_juliaIters j) (_juliaBailout j) (_juliaC j)
       f i =
