@@ -182,14 +182,15 @@ main =
                      R.map (pure . min 255 . round . (*255) . (/aaSq)) foldedAA
                    )
       consumer :: MonadSafe m => Consumer' (Image PixelRGB8) m ()
-      consumer = case _optVideo opts of
-                   True ->
-                     do
-                       let num = length list
-                       liftIO $
-                         putStrLn $ "Writing video with " ++ show num ++ " frames"
-                       ffmpegWriter $ FFmpegOpts width height 60 $ fp ++ ".mp4"
-                   False -> P.take 1 >-> pngWriter 3 fp
+      consumer =
+        case _optVideo opts of
+          True ->
+            do
+              let num = length list
+              liftIO $
+                putStrLn $ "Writing video with " ++ show num ++ " frames"
+              ffmpegWriter $ FFmpegOpts width height 60 $ fp ++ ".mp4"
+          False -> P.take 1 >-> pngWriter 3 fp
 
       list = [0,0.01..2*pi]
     runSafeT $ runEffect $ imageProducer list >-> consumer
