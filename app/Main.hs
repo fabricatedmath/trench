@@ -35,13 +35,6 @@ import Julia
 import Sphere
 import Type
 
-boolToColor :: Maybe Double -> Double
-boolToColor (Just f) = max 0 f
-boolToColor Nothing = 0
-
-toVec :: a -> V3 a
-toVec d = pure d
-
 main :: IO ()
 main =
   do
@@ -49,7 +42,7 @@ main =
     let camera = read fileS :: Camera Double
         V2 width height = _resolution camera
         j = defaultJulia
-        aa = 4
+        aa = 2
         aaSq = fromIntegral $ aa*aa
         viewPlane = runIdentity $ buildViewPlane aa camera
     viewPlane `deepSeqArray` return ()
@@ -64,16 +57,16 @@ main =
                    do
                      s <- sumP $ R.map (\(p,d) -> maybe 0 (max 0) . fmap (shade 10 28 0.02 j . _hitPos) $ intersects o (Ray p d)) viewPlane
                      --s <- sumP $ R.map (\(p,d) -> maybe 0 (const 1) $ intersects o (Ray p d)) viewPlane :: Identity (Array U DIM2 Double)
-                     s `seq` (computeUnboxedP $ R.map (toVec . min 255 . round . (*255) . (/aaSq)) s)
+                     s `seq` (computeUnboxedP $ R.map (pure . min 255 . round . (*255) . (/aaSq)) s)
       consumerFFmpeg :: MonadSafe m => Consumer' (Image PixelRGB8) m ()
       consumerFFmpeg =
         ffmpegWriter $ FFmpegOpts width height 60 "/home/cdurham/Desktop/dog.mp4"
 
       consumerWriter :: forall m. MonadIO m => Consumer' (Image PixelRGB8) m ()
-      consumerWriter = pngWriter 3 "/home/cdurham/Desktop/" "dog"
+      consumerWriter = (await >>= yield) >-> pngWriter 3 "/home/cdurham/Desktop/" "dog"
 
-      list = take 1 [0,0.01..2*pi]
-    runSafeT $ runEffect $ imageProducer list >-> consumerWriter
+      list = [0,0.01..2*pi]
+    runSafeT $ runEffect $ imageProducer list >-> consumerFFmpeg --consumerWriter
 
 spheres :: [Sphere Double]
 spheres = [sphere 1 $ V3 y x z | y <- [-30,-27..30], x <- [-30,-27..30],  z <- [-30]] -- [ (sphere 1 $ V3 0 0 (-300))

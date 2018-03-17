@@ -1,1 +1,1 @@
-Camera {_sensorWidth = 2.0, _resolution = V2 2000 2000, _hfov = 60.0, _location = V3 0.0 0.0 3, _lookingAt = V3 0.0 0.0 0.0}
+Camera {_sensorWidth = 2.0, _resolution = V2 200 200, _hfov = 60.0, _location = V3 0.0 0.0 3, _lookingAt = V3 0.0 0.0 0.0}
