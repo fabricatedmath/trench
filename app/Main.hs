@@ -4,14 +4,9 @@
 
 module Main where
 
-import Lib
-import Julia
-import Sphere
-import Type
-
 import Codec.Picture
 import Control.Monad (forM_, forever)
-import Control.Monad.Identity (runIdentity)
+import Control.Monad.Identity (Identity(..),runIdentity)
 
 import Data.Array.Repa as R
 import Data.Array.Repa.IO.BMP (writeImageToBMP)
@@ -26,7 +21,7 @@ import Linear
 
 import Pipes
 import qualified Pipes.Prelude as P
-import Pipes.Graphics (ffmpegConsumer, repaToImage, FFmpegOpts(..))
+import Pipes.Graphics (ffmpegWriter, repaToImage, FFmpegOpts(..), pngWriter)
 import Pipes.Safe
 
 import Numeric.AD
@@ -34,6 +29,11 @@ import Numeric.AD.Mode.Reverse
 import Numeric.AD.Internal.Reverse
 
 import Text.Printf
+
+import Lib
+import Julia
+import Sphere
+import Type
 
 boolToColor :: Maybe Double -> Double
 boolToColor (Just f) = max 0 f
@@ -49,7 +49,7 @@ main =
     let camera = read fileS :: Camera Double
         V2 width height = _resolution camera
         j = defaultJulia
-        aa = 2
+        aa = 4
         aaSq = fromIntegral $ aa*aa
         viewPlane = runIdentity $ buildViewPlane aa camera
     viewPlane `deepSeqArray` return ()
@@ -62,21 +62,18 @@ main =
                   o = BoundingSphere (Sphere 4 $ V3 0 0 0) rot (j) :: BoundingSphere (Julia Double) Double
                 in repaToImage $ runIdentity $
                    do
-                     s <- sumP $ R.map (\(p,d) -> boolToColor . fmap (shade 10 28 0.02 j . _hitPos) $ intersects o (Ray p d)) viewPlane
+                     s <- sumP $ R.map (\(p,d) -> maybe 0 (max 0) . fmap (shade 10 28 0.02 j . _hitPos) $ intersects o (Ray p d)) viewPlane
+                     --s <- sumP $ R.map (\(p,d) -> maybe 0 (const 1) $ intersects o (Ray p d)) viewPlane :: Identity (Array U DIM2 Double)
                      s `seq` (computeUnboxedP $ R.map (toVec . min 255 . round . (*255) . (/aaSq)) s)
       consumerFFmpeg :: MonadSafe m => Consumer' (Image PixelRGB8) m ()
-      consumerFFmpeg = ffmpegConsumer $ FFmpegOpts width height 60 "/home/cdurham/Desktop/dog.mp4"
+      consumerFFmpeg =
+        ffmpegWriter $ FFmpegOpts width height 60 "/home/cdurham/Desktop/dog.mp4"
 
       consumerWriter :: forall m. MonadIO m => Consumer' (Image PixelRGB8) m ()
-      consumerWriter = go 0
-        where
-          go :: Int -> Consumer' (Image PixelRGB8) m ()
-          go i = do
-            image <- await
-            liftIO $ writePng (printf "/home/cdurham/Desktop/%03d.png" i) image
-            go (i+1)
-      list = [0,0.01..2*pi]
-    runSafeT $ runEffect $ imageProducer list >-> consumerFFmpeg
+      consumerWriter = pngWriter 3 "/home/cdurham/Desktop/" "dog"
+
+      list = take 1 [0,0.01..2*pi]
+    runSafeT $ runEffect $ imageProducer list >-> consumerWriter
 
 spheres :: [Sphere Double]
 spheres = [sphere 1 $ V3 y x z | y <- [-30,-27..30], x <- [-30,-27..30],  z <- [-30]] -- [ (sphere 1 $ V3 0 0 (-300))
