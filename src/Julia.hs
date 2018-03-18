@@ -63,7 +63,7 @@ initial (V3 x y z) = (q,dq)
         dq = Quaternion 1 $ V3 0 0 0
 {-# INLINABLE initial #-}
 
---add consideration for sphere cord cut distance
+--TODO: add consideration for sphere cord cut distance
 marchJulia
   :: RealFloat a
   => Julia a
