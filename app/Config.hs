@@ -12,18 +12,18 @@ import Data.Aeson.Encode.Pretty
 
 import qualified Data.ByteString.Lazy.Char8 as C (readFile, writeFile)
 
-import Linear
-
 import GHC.Generics
+
+import Linear
 
 import System.Console.GetOpt
 import System.Environment (getArgs, getProgName)
 import System.Exit
 import System.IO
 
+import Engine.Type
 import Julia
 import Sphere
-import Type
 
 data Object a =
   JuliaBounding (BoundingSphere (JuliaAnalytic a) a)

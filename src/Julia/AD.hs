@@ -15,7 +15,7 @@ import Linear
 
 import Numeric.AD
 
-import Type
+import Engine.Type
 
 instance (Mode a, Num a) => Mode (V3 a) where
   type Scalar (V3 a) = V3 (Scalar a)

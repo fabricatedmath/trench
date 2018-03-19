@@ -8,7 +8,7 @@ import GHC.Generics
 
 import Linear
 
-import Type
+import Engine.Type
 
 data Julia a =
   Julia

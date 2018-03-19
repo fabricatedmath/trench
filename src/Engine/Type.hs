@@ -7,7 +7,7 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Type where
+module Engine.Type where
 
 import Control.Lens
 

@@ -11,7 +11,7 @@ import Data.Vector.Unboxed (Unbox)
 
 import Linear
 
-import Type
+import Engine.Type
 
 ambientOcclusion
   :: (Fractional a, DistanceFunction o a)

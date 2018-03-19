@@ -13,16 +13,13 @@
 module Julia where
 
 import Control.Lens
-
 import Data.Aeson
-
 import GHC.Generics
 
 import Engine
+import Engine.Type
 import Julia.Type
 import Linear
-import Type
-
 
 newtype JuliaAnalytic a =
   JuliaAnalytic

@@ -5,14 +5,12 @@
 
 module Sphere where
 
-import Linear
-import Type
-
 import Control.Lens
-
 import Data.Aeson
-
 import GHC.Generics
+import Linear
+
+import Engine.Type
 
 data Sphere a =
     Sphere

@@ -20,8 +20,7 @@ import Pipes.Safe
 
 import Config
 import Engine
-import Sphere
-import Type
+import Engine.Type
 
 main :: IO ()
 main =
