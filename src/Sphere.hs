@@ -20,22 +20,43 @@ data Sphere a =
     , _sphereCenter :: !(V3 a)
     } deriving (Generic, Show, Read)
 
+makeLenses ''Sphere
+
+data BoundingSphere o a =
+  BoundingSphere
+  { _boundingSphereSphere :: Sphere a
+  , _boundingSphereRotation :: Quaternion a
+  , _boundingSphereObject :: o
+  } deriving (Generic, Show, Read)
+
+makeLenses ''BoundingSphere
+
 instance ToJSON a => ToJSON (Sphere a) where
   toEncoding = genericToEncoding defaultOptions
 
 instance FromJSON a => FromJSON (Sphere a)
 
-data BoundingSphere o a =
-  BoundingSphere
-  { _boundingSphere :: Sphere a
-  , _boundingSphereRotation :: Quaternion a
-  , _boundingSphereObject :: o
-  } deriving (Generic, Show, Read)
+instance (Floating a, Ord a) => Intersectable (Sphere a) a where
+  intersects s (Ray p d) = uncurry Hit <$> rayAgainstSphere s (p,d)
+  {-# INLINABLE intersects #-}
+
+  intersects' s (Ray p d) = rayAgainstSphere' s (p,d)
+  {-# INLINABLE intersects' #-}
+
+instance Rotate (Sphere a) a where
+  rotateObject o _ = o
 
 instance (ToJSON o, ToJSON a) => ToJSON (BoundingSphere o a) where
   toEncoding = genericToEncoding defaultOptions
 
 instance (FromJSON o, FromJSON a) => FromJSON (BoundingSphere o a)
+
+instance RealFloat a => Rotate (BoundingSphere o a) a where
+  rotateObject bs q = over boundingSphereRotation (*q) bs
+
+instance Shade o a => Shade (BoundingSphere (o a)) a where
+  shade aoParams o = shade aoParams (_boundingSphereObject o)
+  {-# INLINABLE shade #-}
 
 boundingSphere
   :: Num a
@@ -44,15 +65,6 @@ boundingSphere
   -> BoundingSphere o a
 boundingSphere s o = BoundingSphere s r o
   where r = Quaternion 1 0
-
-makeLenses ''Sphere
-
-instance (Floating a, Ord a) => Intersectable (Sphere a) a where
-  intersects s (Ray p d) = uncurry Hit <$> rayAgainstSphere s (p,d)
-  {-# INLINABLE intersects #-}
-
-  intersects' s (Ray p d) = rayAgainstSphere' s (p,d)
-  {-# INLINABLE intersects' #-}
 
 instance
   (Conjugate a, Floating a, Intersectable o a, RealFloat a, Ord a
@@ -82,6 +94,7 @@ sphere r c = Sphere r c
 distSphere :: Floating a => V3 a -> Sphere a -> a
 distSphere p (Sphere r _c) = norm p - r
 
+--TODO: implement this
 convertSphereHitToRadius
   :: (Epsilon a, Floating a)
   => Sphere a

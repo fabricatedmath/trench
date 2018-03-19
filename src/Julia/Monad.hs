@@ -4,9 +4,9 @@
 
 module Julia.Monad where
 
-import Control.Monad (replicateM_)
+--import Control.Monad (replicateM_)
 import Control.Monad.Identity
-import Control.Monad.Trans
+--import Control.Monad.Trans
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.State.Strict
 import Linear
@@ -58,6 +58,7 @@ juliaDistance iters bailout c v =
   in 0.5 * r * log r / dr
 -}
 
+{-
 --julia
 --  :: RealFloat a
 --  => a
@@ -69,3 +70,4 @@ julia bailout c =
     qdq@(!q,!_dq) <- get
     when (quadrance q > bailout) $ lift $ Left qdq
     put $ juliaFunc c qdq
+-}

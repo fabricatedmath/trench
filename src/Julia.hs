@@ -8,82 +8,55 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Julia where
 
-import Control.Arrow
 import Control.Lens
 
 import Data.Aeson
 
 import GHC.Generics
 
+import Engine
+import Julia.Type
 import Linear
-
 import Type
 
-type Q = Quaternion
 
-instance RealFloat a => Intersectable (Julia a) a where
-  intersects = marchJulia
-  {-# INLINABLE intersects #-}
-
-data Julia a =
-  Julia
-  { _juliaIters :: Int
-  , _juliaBailout :: a
-  , _juliaC :: Q a
-  , _juliaFudge :: a
-  , _juliaThresh :: a
-  , _juliaMarchIter :: Int
+newtype JuliaAnalytic a =
+  JuliaAnalytic
+  { unJuliaAnalytic :: Julia a
   } deriving (Generic, Show, Read)
 
-instance ToJSON a => ToJSON (Julia a) where
+instance ToJSON a => ToJSON (JuliaAnalytic a) where
   toEncoding = genericToEncoding defaultOptions
 
-instance FromJSON a => FromJSON (Julia a)
+instance FromJSON a => FromJSON (JuliaAnalytic a)
 
-defaultJulia :: Fractional a => Julia a
-defaultJulia =
-  Julia
-  { _juliaIters = 100
-  , _juliaBailout = 10000
-  , _juliaC = Quaternion (-0.125) $ V3 (-0.256) 0.847 0
-  , _juliaFudge = 0.75
-  , _juliaThresh = 0.001
-  , _juliaMarchIter = 200
-  }
+instance Fractional a => DefaultParams (JuliaAnalytic a) where
+  defaultParams = JuliaAnalytic defaultParams
 
-initial
-  :: Num a
-  => V3 a
-  -> (Q a, Q a)
-initial (V3 x y z) = (q,dq)
-  where q = Quaternion x $ V3 y z 0
-        dq = Quaternion 1 $ V3 0 0 0
-{-# INLINABLE initial #-}
-
---TODO: add consideration for sphere cord cut distance
-marchJulia
-  :: RealFloat a
-  => Julia a
-  -> Ray a
-  -> Maybe (Hit a)
-marchJulia (Julia iters bailout c f t maxSteps) (Ray rp rd) =
-  go maxSteps 0
-  where
-    go !i !d
-      | i == 0 || d > 10 = Nothing
-      | d' < t = Just $ Hit d rp'
-      | otherwise = go (i-1) (d + d')
-      where
-        rp' = rp + d*^rd
-        d' = f * juliaDistance iters bailout c rp'
-{-# INLINABLE marchJulia #-}
-
-instance (Epsilon a, RealFloat a) => Normal Julia a where
-  normalOf j = juliaAnalyticNormal (_juliaIters j) (_juliaBailout j) (_juliaC j)
+instance (Epsilon a, RealFloat a) => HasNormal JuliaAnalytic a where
+  normalOf (unJuliaAnalytic -> j) =
+    Normal . juliaAnalyticNormal (_juliaIters j) (_juliaBailout j) (_juliaC j)
   {-# INLINABLE normalOf #-}
+
+instance RealFloat a => DistanceFunction (JuliaAnalytic a) a where
+  distanceTo (unJuliaAnalytic -> j) =
+    juliaDistance (_juliaIters j) (_juliaBailout j) (_juliaC j)
+  {-# INLINABLE distanceTo #-}
+
+instance (Epsilon a, RealFloat a, Fractional a) => Shade JuliaAnalytic a where
+  shade aoParams ja p = ambientOcclusion aoParams ja n p
+    where n = normalOf ja p
+  {-# INLINABLE shade #-}
+
+instance RealFloat a => Intersectable (JuliaAnalytic a) a where
+  intersects ja@(unJuliaAnalytic -> Julia _iters _bailout _c f t maxSteps) =
+    marchDistance ja maxSteps 10 f t
+  --TODO: add consideration for sphere cord cut distance
+  {-# INLINABLE intersects #-}
 
 juliaDistance
   :: forall a. (Floating a, RealFloat a, Ord a)
@@ -98,15 +71,11 @@ juliaDistance iters bailout c v =
       go i qdq@(!q,!dq)
         | i == 0 || quadrance q > bailout = qdq
         | otherwise = go (i-1) (q',dq')
-        where (!q',!dq') = second (*dq) $ juliaFunc c q
+        where (!q',!dq') = (q*q+c,2*q*dq)
       (!r,!dr) = (norm qf, norm dqf)
         where (!qf,!dqf) = go iters qdqi
   in 0.5 * r * log r / dr
 {-# INLINABLE juliaDistance #-}
-
-juliaFunc :: Num p => p -> p -> (p,p)
-juliaFunc c q = (q*q+c,2*q)
-{-# INLINABLE juliaFunc #-}
 
 -- | Analytical Normal of Julia set (z^2 + c) over the Quaternions
 --
@@ -145,22 +114,6 @@ juliaAnalyticNormal iters bailout c v =
           dz3' = dzmul dz3
           z' = z*z + c
         in f (i-1) (z',dz0',dz1',dz2',dz3')
-
   in
     f iters (iz,idz0,idz1,idz2,idz3)
 {-# INLINABLE juliaAnalyticNormal #-}
-
-instance (Epsilon a, RealFloat a, Fractional a) => Shade Julia a where
-  shade aoParams j p =
-    let
-      num = _shaderNumSamples aoParams
-      k = _shaderK aoParams
-      del = _shaderDel aoParams
-      n = normalOf j p
-      df = juliaDistance (_juliaIters j) (_juliaBailout j) (_juliaC j)
-      f i =
-        let i' = fromIntegral i
-        in recip (2^i) * (i'*del - df (p + (n^*(i'*del))))
-
-    in 1 - k * sum (map f [1..num])
-  {-# INLINABLE shade #-}

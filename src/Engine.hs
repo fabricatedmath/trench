@@ -1,20 +1,57 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Lib where
+module Engine where
 
 import Control.Lens
 
-import Data.Array.Repa hiding ((*^))
+import Data.Array.Repa hiding ((*^), map)
 import Data.Vector.Unboxed (Unbox)
 
 import Linear
 
 import Type
+
+ambientOcclusion
+  :: (Fractional a, DistanceFunction o a)
+  => AOParams a
+  -> o
+  -> Normal a
+  -> V3 a
+  -> a
+ambientOcclusion aoParams o (unNormal -> n) p =
+  let
+      num = _shaderNumSamples aoParams
+      k = _shaderK aoParams
+      del = _shaderDel aoParams
+      df = distanceTo o
+      f i =
+        let i' = fromIntegral i
+        in recip (2^i) * (i'*del - df (p + (n^*(i'*del))))
+    in 1 - k * sum (map f [1..num])
+{-# INLINABLE ambientOcclusion #-}
+
+marchDistance
+  :: (DistanceFunction o a, Eq a, Num a, Ord a)
+  => o
+  -> Int --max steps
+  -> a --max radius
+  -> a --fudge factor
+  -> a --thresh
+  -> Ray a
+  -> Maybe (Hit a)
+marchDistance o maxSteps r f t (Ray rp rd) =
+  go maxSteps 0
+  where
+    go !i !d
+      | t == 0 || d > r = Nothing
+      | d' < t = Just $ Hit d rp'
+      | otherwise = go (pred i) (d + d')
+      where
+        rp' = rp + d*^rd
+        d' = f * distanceTo o rp'
+{-# INLINABLE marchDistance #-}
 
 buildViewPlane
   :: forall a m. (Epsilon a, Floating a, Fractional a, Ord a, Unbox a, Monad m)

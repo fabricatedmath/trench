@@ -17,8 +17,6 @@ import Numeric.AD
 
 import Type
 
-type Q = Quaternion
-
 instance (Mode a, Num a) => Mode (V3 a) where
   type Scalar (V3 a) = V3 (Scalar a)
   auto (V3 x y z) = V3 (auto x) (auto y) (auto z)
@@ -92,8 +90,8 @@ juliaNormal iters bailout c =
   grad (juliaDistance iters (auto bailout) (auto c))
 {-# INLINABLE juliaNormal #-}
 
-instance RealFloat a => Normal Julia a where
-  normalOf j = juliaNormal (_juliaIters j) (_juliaBailout j) (_juliaC j)
+instance RealFloat a => HasNormal Julia a where
+  normalOf j = Normal . juliaNormal (_juliaIters j) (_juliaBailout j) (_juliaC j)
   {-# INLINABLE normalOf #-}
 
 juliaDistance
@@ -121,7 +119,7 @@ instance (Epsilon a, RealFloat a, Fractional a) => Shade Julia a where
       num = _shaderNumSamples aoParams
       k = _shaderK aoParams
       del = _shaderDel aoParams
-      n = normalOf j p
+      n = unNormal $ normalOf j p
       df = juliaDistance (_juliaIters j) (_juliaBailout j) (_juliaC j)
       f i =
         let i' = fromIntegral i

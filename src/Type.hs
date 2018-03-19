@@ -4,6 +4,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Type where
@@ -11,12 +12,17 @@ module Type where
 import Control.Lens
 
 import Data.Aeson
-import Data.Array.Repa hiding ((*^))
+import Data.Array.Repa hiding ((*^), map)
 import Data.Maybe (isJust)
 
 import Linear
 
 import GHC.Generics hiding (V1)
+
+type Q = Quaternion
+
+class DefaultParams o where
+  defaultParams :: o
 
 data AOParams a =
   AOParams
@@ -25,13 +31,16 @@ data AOParams a =
   , _shaderDel :: a
   } deriving (Generic, Show, Read)
 
-defaultAOParams :: Fractional a => AOParams a
-defaultAOParams =
-  AOParams
-  { _shaderNumSamples = 10
-  , _shaderK = 5.1
-  , _shaderDel = 0.1
-  }
+instance Fractional a => DefaultParams (AOParams a) where
+  defaultParams = defaultAOParams
+    where
+      defaultAOParams :: Fractional a => AOParams a
+      defaultAOParams =
+        AOParams
+        { _shaderNumSamples = 10
+        , _shaderK = 5.1
+        , _shaderDel = 0.1
+        }
 
 data Camera a =
   Camera
@@ -42,15 +51,18 @@ data Camera a =
   , _lookingAt :: V3 a
   } deriving (Generic, Show, Read)
 
-defaultCamera :: Fractional a => Camera a
-defaultCamera =
-  Camera
-  { _sensorWidth = 2
-  , _resolution = V2 1000 1000
-  , _hfov = 60
-  , _location = V3 0 0 3
-  , _lookingAt = V3 0 0 0
-  }
+instance Fractional a => DefaultParams (Camera a) where
+  defaultParams = defaultCamera
+    where
+      defaultCamera :: Fractional a => Camera a
+      defaultCamera =
+        Camera
+        { _sensorWidth = 2
+        , _resolution = V2 1000 1000
+        , _hfov = 60
+        , _location = V3 0 0 3
+        , _lookingAt = V3 0 0 0
+        }
 
 data Ray a =
   Ray
@@ -73,14 +85,25 @@ makeLenses ''Hit
 
 type Accum a t = (t -> a -> t)
 
+newtype Normal a =
+  Normal
+  { unNormal :: V3 a
+  } deriving (Show, Read)
+
+class DistanceFunction o a where
+  distanceTo :: o -> V3 a -> a
+
 class Intersectable o a where
   intersects :: o -> Ray a -> Maybe (Hit a)
 
   intersects' :: o -> Ray a -> Bool
   intersects' o r = isJust $ intersects o r
 
-class Normal o a where
-  normalOf :: o a -> V3 a -> V3 a
+class Rotate o a where
+  rotateObject :: o -> Q a -> o
+
+class HasNormal o a where
+  normalOf :: o a -> V3 a -> Normal a
 
 class Shade o a where
   shade :: AOParams a -> o a -> V3 a -> a
